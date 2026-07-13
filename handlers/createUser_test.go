@@ -21,7 +21,7 @@ func setupTestDB() *gorm.DB {
 	}
 
 	// Auto migrate tables
-	err = db.AutoMigrate(&models.Customer{})
+	err = db.AutoMigrate(&models.Customer{}, &models.Product{})
 	if err != nil {
 		panic("failed to migrate test database")
 	}

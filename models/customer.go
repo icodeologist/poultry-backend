@@ -1,8 +1,8 @@
 package models
 
 type Customer struct {
-	ID          uint
-	Name        string
-	PhoneNumber string
-	Balance     float64
+	ID          uint    `gorm:"primaryKey"`
+	Name        string  `json:"name"`
+	PhoneNumber string  `json:"phone_number"`
+	Balance     float64 `json:"balance"`
 }

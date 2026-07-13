@@ -58,6 +58,7 @@ func (ns *CustomerHandler) CreateNewUser(w http.ResponseWriter, r *http.Request)
 	if result.Error != nil {
 		slog.Error("Failed to create customer", "err", result.Error)
 		http.Error(w, "failed to create customer", http.StatusInternalServerError)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
