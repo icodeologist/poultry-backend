@@ -15,9 +15,11 @@ func main() {
 	customerHandler := handlers.NewCustomerHandler(db.DB)
 	productHandler := handlers.NewProductHandler(db.DB)
 	searchHandler := handlers.NewSearchUserCustomHandler(db.DB)
+	adminHandler := handlers.NewAdminHandler(db.DB)
 
 	r.HandleFunc("/create", customerHandler.CreateNewUser)
 	r.HandleFunc("/add/product", productHandler.AddProduct)
 	r.HandleFunc("/search/{phonenumber}", searchHandler.SearchByPhoneNumber)
+	r.HandleFunc("/admin/register", adminHandler.RegisterAdmin)
 	log.Fatal(http.ListenAndServe(":3000", r))
 }

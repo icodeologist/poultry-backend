@@ -21,7 +21,7 @@ func ConnectTODB() {
 		log.Fatalf("Failed to connect to DB : %v\n", err)
 	}
 
-	err = DB.AutoMigrate(&models.Customer{}, &models.Product{})
+	err = DB.AutoMigrate(&models.Customer{}, &models.Product{}, &models.Admin{})
 	if err != nil {
 		log.Fatalf("Migrations failed %v\n", err)
 	}
