@@ -60,7 +60,34 @@ func (a *AdminHandler) RegisterAdmin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(admin)
 }
 
-// func (a *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
-// 	var adminLoginInfo models.AdminLoginInfo
-//
-// }
+func (a *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
+	var adminLoginInfo models.AdminLoginInfo
+	if err := json.NewDecoder(r.Body).Decode(&adminLoginInfo); err != nil {
+		slog.Error("Invalid json", "err", err)
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	// cross check password
+	// TODO: hanlde email verification with @ and all symbol
+	if adminLoginInfo.Email == "" {
+		slog.Warn("Empty or invalid email")
+		http.Error(w, "email cannot be emtpy", http.StatusBadRequest)
+		return
+	}
+
+	var checkPass models.Admin
+	res := a.DB.Where("admin_email=?", adminLoginInfo.Email).First(&checkPass)
+	if res.Error != nil {
+		slog.Error("No matches found")
+		http.Error(w, "No email found.", http.StatusNotFound)
+		return
+	}
+	if adminLoginInfo.Password != checkPass.Password {
+		slog.Error("Wrong Password")
+		http.Error(w, "password do no match", http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode("You logged in as a admin")
+}

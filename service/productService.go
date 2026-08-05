@@ -101,3 +101,13 @@ func (s *ProductService) DeleteProduct(productID uint) error {
 	}
 	return nil
 }
+
+func (s *ProductService) GetAllProducts() ([]models.Product, error) {
+	var products []models.Product
+	resError := s.DB.Find(&products).Error
+	if resError != nil {
+		slog.Error("DB error", "err", resError)
+		return products, resError
+	}
+	return products, nil
+}

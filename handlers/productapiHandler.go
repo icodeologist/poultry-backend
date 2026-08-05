@@ -85,6 +85,16 @@ func (p *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (p *ProductHandler) GetAllProductsFromDB(w http.ResponseWriter, r *http.Request) {
+	products, err := p.Svc.GetAllProducts()
+	if err != nil {
+		writeProductError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusContinue)
+	json.NewEncoder(w).Encode(products)
+}
+
 func writeProductError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidPrice), errors.Is(err, service.ErrEmptyTitle):
