@@ -5,4 +5,5 @@ type Customer struct {
 	Name        string  `json:"name"`
 	PhoneNumber string  `json:"phone_number"`
 	Balance     float64 `json:"balance"`
+	Orders      []Order
 }
