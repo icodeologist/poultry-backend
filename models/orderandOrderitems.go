@@ -3,15 +3,15 @@ package models
 import "time"
 
 type Order struct {
-	ID              uint
-	UserID          uint // fk -> User
-	TimeStamp       time.Time
-	TotalAmount     float64
-	TransactionType TransactionType
-	PaymentMethod   PaymentMethod
-	PaymentBalance  float64
-	Status          string
-	OrderItems      []OrderItem // one  to many with orderItem
+	ID             uint
+	CustomerID     *uint // fk -> User
+	Customer       Customer
+	TimeStamp      time.Time
+	TotalAmount    float64
+	PaymentMethod  PaymentMethod
+	PaymentBalance float64
+	Status         string
+	OrderItems     []OrderItem // one  to many with orderItem
 }
 
 type OrderItem struct {
@@ -22,13 +22,10 @@ type OrderItem struct {
 	PriceAtSale float64
 }
 
-type PaymentMethod struct {
-	UPITransaction string
-	CashInHand     string
-	CardPayment    string
-}
+type PaymentMethod string
 
-type TransactionType struct {
-	Debit  string
-	Credit string
-}
+const (
+	UPI  PaymentMethod = "UPI"
+	CASH PaymentMethod = "CASH"
+	CARD PaymentMethod = "CARD"
+)
