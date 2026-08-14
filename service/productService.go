@@ -26,14 +26,16 @@ func NewProductService(db *gorm.DB) *ProductService {
 }
 
 func (s *ProductService) AddProduct(product models.Product) (models.Product, error) {
-	if product.Title == "" {
-		slog.Warn("Empty product name")
-		return models.Product{}, ErrEmptyTitle
-	}
-	if product.Price == 0.0 {
-		slog.Warn("Product's price cannot be 0")
-		return models.Product{}, ErrInvalidPrice
-	}
+	//:TODO add product title
+	// if product.Title == "" {
+	// 	slog.Warn("Empty product name")
+	// 	return models.Product{}, ErrEmptyTitle
+	// }
+	// TODO: Remove the comment here
+	// if product.Price == 0.0 {
+	// 	slog.Warn("Product's price cannot be 0")
+	// 	return models.Product{}, ErrInvalidPrice
+	// }
 
 	var existingProduct models.Product
 	exRes := s.DB.Where("title=?", product.Title).First(&existingProduct)
