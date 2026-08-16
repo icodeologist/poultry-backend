@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/icodeologist/poultry-backend/models"
@@ -61,10 +62,10 @@ func (os *OrderService) CreateOrder(items []models.CartlineInput) (models.Order,
 	var order models.Order
 	err = os.DB.Transaction(func(tx *gorm.DB) error {
 		order = models.Order{
-			TimeStamp:   time.Now(),
-			TotalAmount: totalBill,
-			// PaymentMethod:  paymentMethod,
-			// PaymentBalance: totalBill - amountPaid,
+			TimeStamp:      time.Now(),
+			TotalAmount:    totalBill,
+			PaymentBalance: totalBill,
+			Status:         "Pending",
 		}
 		if err := tx.Create(&order).Error; err != nil {
 			return err
@@ -90,5 +91,61 @@ func (os *OrderService) CreateOrder(items []models.CartlineInput) (models.Order,
 		}
 		return nil
 	})
+	if err != nil {
+		log.Printf("Create Order transaction failed : %v\n", err)
+		return models.Order{}, err
+	}
+	log.Printf("Order : %v\n", order)
 	return order, nil
+}
+
+// separate way to record payment and update stocks
+func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string) (models.Order, models.Payment, error) {
+	var order models.Order
+	var payment models.Payment
+
+	err := os.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.First(&order, orderID).Error; err != nil {
+			return fmt.Errorf("fetching order with id %v: %v", orderID, err)
+		}
+		if order.Status == "Completed" {
+			return fmt.Errorf("order is fully paid %v", orderID)
+		}
+		if tendered <= 0 {
+			return fmt.Errorf("tendered cannot be 0 or negative, order %v", orderID)
+		}
+
+		amountDue := order.PaymentBalance
+		var applied, change float64
+		if tendered >= amountDue {
+			applied = amountDue
+			change = tendered - amountDue
+		} else {
+			applied = tendered
+			change = 0
+		}
+
+		payment = models.Payment{
+			OrderID:        orderID,
+			AmountTendered: tendered,
+			ChangeGiven:    change,
+			Method:         paymentMethod,
+			TimeStamp:      time.Now(),
+		}
+		if err := tx.Create(&payment).Error; err != nil {
+			return fmt.Errorf("creating payment: %w", err)
+		}
+
+		order.PaymentBalance -= applied
+		if order.PaymentBalance <= 0.01 {
+			order.PaymentBalance = 0
+			order.Status = "Completed"
+		}
+		if err := tx.Save(&order).Error; err != nil {
+			return fmt.Errorf("updating order: %w", err)
+		}
+		return nil
+	})
+
+	return order, payment, err
 }
