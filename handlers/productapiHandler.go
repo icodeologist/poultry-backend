@@ -85,6 +85,36 @@ func (p *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type updateStock struct {
+	Stock int `json:"stock"`
+}
+
+func (p *ProductHandler) UpdateProductStck(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idParam := vars["id"]
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		writeProductError(w, err)
+		return
+	}
+	var up updateStock
+	if err := json.NewDecoder(r.Body).Decode(&up); err != nil {
+		slog.Error("Invalid json", "err", err)
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	pdct, err := p.Svc.UpdateProductStock(uint(id), up.Stock)
+	if err != nil {
+		writeProductError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	json.NewEncoder(w).Encode(pdct)
+
+}
+
 func (p *ProductHandler) GetAllProductsFromDB(w http.ResponseWriter, r *http.Request) {
 	products, err := p.Svc.GetAllProducts()
 	if err != nil {

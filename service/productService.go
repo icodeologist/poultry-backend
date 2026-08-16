@@ -113,3 +113,22 @@ func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 	}
 	return products, nil
 }
+
+func (s *ProductService) UpdateProductStock(productID uint, updateUnits int) (models.Product, error) {
+	var product models.Product
+	res := s.DB.First(&product, productID)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		slog.Warn("Product not found for delete", "id", productID)
+		return product, ErrNotFound
+	} else if res.Error != nil {
+		slog.Error("DB error", "err", res.Error)
+		return product, res.Error
+	}
+	product.Stock_Quantity += updateUnits
+
+	if err := s.DB.Save(&product).Error; err != nil {
+		slog.Error("Failed to save product", "err", err)
+		return product, err
+	}
+	return product, nil
+}
