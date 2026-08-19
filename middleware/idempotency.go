@@ -32,7 +32,7 @@ func IdempotencyMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 			// now we assume key is valid
 			// is this new key or do we already have registered this key
 			// fecth the key data from db and if it exists then we have already processing or processed this request
-			var ip models.OrderIdempotency
+			var ip models.OrderAndPaymentIdempotency
 			ip.Key = key
 			ip.CreatedAt = time.Now()
 			err := db.Create(&ip).Error
@@ -40,7 +40,7 @@ func IdempotencyMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 			// so reject this but dont send error send the status code and staus response from the original request
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				log.Printf("Duplicated key reqeust : %v\n", err)
-				var existing models.OrderIdempotency
+				var existing models.OrderAndPaymentIdempotency
 				res := db.Where("key=?", key).First(&existing)
 				// no chnace of having no keys since we already know it exists with the key
 				if res.Error != nil {
