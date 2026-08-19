@@ -1,12 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/icodeologist/poultry-backend/db"
 	"github.com/icodeologist/poultry-backend/handlers"
+	"github.com/icodeologist/poultry-backend/middleware"
+
+	// "github.com/icodeologist/poultry-backend/middleware"
 	"github.com/icodeologist/poultry-backend/service"
 	"github.com/rs/cors"
 )
@@ -63,8 +67,20 @@ func main() {
 	r.HandleFunc("/admin/login", adminHandler.LoginAdmin)
 	r.HandleFunc("/product/create", productHandler.AddProduct)
 	r.HandleFunc("/product/editprice/{id}", productHandler.EditPrice)
+	r.HandleFunc("/product/updateStock/{id}", productHandler.UpdateProductStck)
 	r.HandleFunc("/product/delete/{id}", productHandler.DeleteProduct)
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
-	r.HandleFunc("/new-order", orderHandler.CheckOutFlow)
-	log.Fatal(http.ListenAndServe(":3000", c.Handler(r)))
+
+	protected := r.NewRoute().Subrouter()
+	protected.Use(middleware.IdempotencyMiddleware(db.DB))
+	protected.HandleFunc("/new-order", orderHandler.CreateNewOrder).Methods("POST")
+	protected.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment).Methods("POST")
+
+	log.Fatal(http.ListenAndServe(":5000", c.Handler(r)))
+}
+
+func dummy(w http.ResponseWriter, r *http.Request) {
+	log.Printf("w : %v\n", w.Header())
+	w.WriteHeader(401)
+	json.NewEncoder(w).Encode("data : data")
 }
