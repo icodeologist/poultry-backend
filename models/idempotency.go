@@ -5,7 +5,8 @@ import (
 )
 
 type OrderIdempotency struct {
-	Key            string `gorm:"primaryKey"`
+	ID             uint   `gorm:"primaryKey"`
+	Key            string `gorm:"unique"`
 	RequestHash    string
 	ResponseBody   string
 	ResponseStatus int
