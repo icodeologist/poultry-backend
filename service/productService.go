@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"github.com/icodeologist/poultry-backend/models"
@@ -131,4 +132,21 @@ func (s *ProductService) UpdateProductStock(productID uint, updateUnits int) (mo
 		return product, err
 	}
 	return product, nil
+}
+
+func (s *ProductService) UpdateProduct(id uint64, updates map[string]interface{}) (*models.Product, error) {
+	var product models.Product
+
+	res := s.DB.First(&product, id)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	} else if res.Error != nil {
+		return nil, fmt.Errorf("fetching product: %w", res.Error)
+	}
+
+	if err := s.DB.Model(&product).Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("updating product: %w", err)
+	}
+
+	return &product, nil
 }
