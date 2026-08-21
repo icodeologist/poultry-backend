@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -70,17 +70,23 @@ func main() {
 	r.HandleFunc("/product/updateStock/{id}", productHandler.UpdateProductStck)
 	r.HandleFunc("/product/delete/{id}", productHandler.DeleteProduct)
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
+	r.HandleFunc("/new-order", orderHandler.CreateNewOrder)
+	r.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment)
+
+	adminRoute := r.NewRoute().Subrouter()
+	adminRoute.Use(middleware.AdminMiddleware)
+	adminRoute.HandleFunc("/dummy", dummy)
+	adminRoute.HandleFunc("/admin/update-product/{id}", productHandler.UpdateProduct)
 
 	protected := r.NewRoute().Subrouter()
 	protected.Use(middleware.IdempotencyMiddleware(db.DB))
 	protected.HandleFunc("/new-order", orderHandler.CreateNewOrder).Methods("POST")
-	protected.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment).Methods("POST")
+	protected.HandleFunc("orders/{id}/payment", orderHandler.RecordPayment).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":5000", c.Handler(r)))
 }
 
 func dummy(w http.ResponseWriter, r *http.Request) {
-	log.Printf("w : %v\n", w.Header())
-	w.WriteHeader(401)
-	json.NewEncoder(w).Encode("data : data")
+	fmt.Println("the dummy endpoint was hit")
+	fmt.Fprint(w, "Hello people")
 }
