@@ -125,6 +125,75 @@ func (p *ProductHandler) GetAllProductsFromDB(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(products)
 }
 
+// handler where admin updates the product
+// pointer so that we can difference between nil value and actual 0
+type UpdateProductInfo struct {
+	Title         *string  `json:"title"`
+	Price         *float64 `json:"price"`
+	StockQuantity *int     `json:"stockQuantity"`
+}
+
+func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idStr := vars["id"]
+	slog.Info("path value", "id", idStr, "url", r.URL.Path)
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		writeProductError(w, err)
+		return
+	}
+
+	var req UpdateProductInfo
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("invalid json", "err", err)
+		writeProductError(w, err)
+		return
+	}
+	// updates gives the only field we need to update in the product model
+	updates := map[string]any{}
+
+	if req.Title != nil {
+		if *req.Title == "" {
+			writeProductError(w, err)
+			return
+		}
+		updates["title"] = *req.Title
+	}
+	if req.Price != nil {
+		if *req.Price < 0 {
+			writeProductError(w, err)
+			return
+		}
+		updates["price"] = *req.Price
+	}
+	if req.StockQuantity != nil {
+		if *req.StockQuantity < 0 {
+			writeProductError(w, err)
+			return
+		}
+		updates["stock_quantity"] = *req.StockQuantity
+	}
+
+	if len(updates) == 0 {
+		writeProductError(w, err)
+		return
+	}
+
+	product, err := h.Svc.UpdateProduct(id, updates)
+	if errors.Is(err, service.ErrNotFound) {
+		writeProductError(w, err)
+		return
+	} else if err != nil {
+		slog.Error("update product failed", "err", err)
+		writeProductError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(product)
+}
+
 func writeProductError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidPrice), errors.Is(err, service.ErrEmptyTitle):
