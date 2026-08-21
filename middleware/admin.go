@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -37,30 +38,38 @@ func AdminMiddleware(next http.Handler) http.Handler {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte("hello"), nil
+			return []byte("help"), nil
 		})
 		log.Printf("token : %v\n", token)
 
 		switch {
 		case token.Valid:
-			fmt.Println("You look nice today")
+			// proceed — don't log something like "you look nice today" in real code,
+			// just fall through past the switch to next.ServeHTTP
+
 		case errors.Is(err, jwt.ErrTokenMalformed):
-			fmt.Println("That's not even a token")
-			http.Error(w, "invalid token", http.StatusBadRequest)
+			slog.Warn("malformed token received")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
+
 		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
-			// Invalid signature
-			fmt.Println("Invalid signature")
-			http.Error(w, "invalid signature", http.StatusBadRequest)
+			slog.Warn("invalid token signature")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
-		case errors.Is(err, jwt.ErrTokenExpired) || errors.Is(err, jwt.ErrTokenNotValidYet):
-			// Token is either expired or not active yet
-			fmt.Println("Timing is everything")
-			http.Error(w, "expired token", http.StatusBadRequest)
+
+		case errors.Is(err, jwt.ErrTokenExpired):
+			slog.Info("expired token")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
+
+		case errors.Is(err, jwt.ErrTokenNotValidYet):
+			slog.Warn("token used before valid")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+
 		default:
-			fmt.Println("Couldn't handle this token:", err)
-			http.Error(w, "unexpected error", http.StatusBadRequest)
+			slog.Error("unexpected token validation error", "err", err)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
