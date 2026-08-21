@@ -5,7 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/icodeologist/poultry-backend/models"
 	"gorm.io/gorm"
 )
@@ -19,6 +21,8 @@ func NewAdminHandler(db *gorm.DB) *AdminHandler {
 		DB: db,
 	}
 }
+
+const secretkey = "hello"
 
 func (a *AdminHandler) RegisterAdmin(w http.ResponseWriter, r *http.Request) {
 	var admin models.Admin
@@ -87,6 +91,30 @@ func (a *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "password do no match", http.StatusUnauthorized)
 		return
 	}
+	claims := jwt.MapClaims{
+		"role": "admin",
+		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(secretkey))
+	if err != nil {
+		slog.Error("Signing string with key to a token error", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	cookie := http.Cookie{
+		Name:     "admin-authorization",
+		Value:    signedToken,
+		Path:     "/",
+		Expires:  time.Now().Add(24 * time.Hour),
+		HttpOnly: true,
+		Secure:   false, // flip to true in prod via env var
+		SameSite: http.SameSiteLaxMode,
+	}
+
+	http.SetCookie(w, &cookie)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode("You logged in as a admin")
