@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 )
+
+const adminIDKey = "adminID"
 
 // admin middleware parses through incoming reqeust and gets the unique key kind  of like jwt
 // you take the key and decrypt it using hashing with local stored secret key and if they match you edit the role to admin
@@ -32,46 +35,57 @@ func AdminMiddleware(next http.Handler) http.Handler {
 				return
 			}
 		}
-
 		// parse  the token
 		token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (any, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte("help"), nil
+			return []byte("hello"), nil
 		})
 		log.Printf("token : %v\n", token)
 
 		switch {
 		case token.Valid:
-			// proceed — don't log something like "you look nice today" in real code,
-			// just fall through past the switch to next.ServeHTTP
+			slog.Info("Success", "token expires in ", token.Claims)
 
 		case errors.Is(err, jwt.ErrTokenMalformed):
 			slog.Warn("malformed token received")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorized 1", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
 			slog.Warn("invalid token signature")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorized 2", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenExpired):
 			slog.Info("expired token")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorized 3", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenNotValidYet):
 			slog.Warn("token used before valid")
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorized 4", http.StatusUnauthorized)
 			return
 
 		default:
 			slog.Error("unexpected token validation error", "err", err)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			http.Error(w, "unauthorized 5", http.StatusUnauthorized)
 			return
 		}
-		next.ServeHTTP(w, r)
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			http.Error(w, "unauthorized 6", http.StatusUnauthorized)
+			return
+		}
+
+		adminID, ok := claims["admin_id"].(float64)
+		if !ok || adminID == 0.0 {
+			log.Println("admin id : ", adminID)
+			http.Error(w, "unauthorized 7", http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "adminID", adminID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
