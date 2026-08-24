@@ -50,39 +50,39 @@ func AdminMiddleware(next http.Handler) http.Handler {
 
 		case errors.Is(err, jwt.ErrTokenMalformed):
 			slog.Warn("malformed token received")
-			http.Error(w, "unauthorized 1", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
 			slog.Warn("invalid token signature")
-			http.Error(w, "unauthorized 2", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenExpired):
 			slog.Info("expired token")
-			http.Error(w, "unauthorized 3", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 
 		case errors.Is(err, jwt.ErrTokenNotValidYet):
 			slog.Warn("token used before valid")
-			http.Error(w, "unauthorized 4", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 
 		default:
 			slog.Error("unexpected token validation error", "err", err)
-			http.Error(w, "unauthorized 5", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 		}
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
-			http.Error(w, "unauthorized 6", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 		}
 
 		adminID, ok := claims["admin_id"].(float64)
 		if !ok || adminID == 0.0 {
 			log.Println("admin id : ", adminID)
-			http.Error(w, "unauthorized 7", http.StatusUnauthorized)
+			http.Error(w, "unauthorized ", http.StatusUnauthorized)
 			return
 		}
 		ctx := context.WithValue(r.Context(), "adminID", adminID)
