@@ -29,7 +29,7 @@ func (o *OrderHandler) CreateNewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := o.OrdSvc.CreateOrder(checkOutReq.Items)
+	order, err := o.OrdSvc.CreateOrder(checkOutReq.CustomerID, checkOutReq.Items)
 	if err != nil {
 		slog.Error("create_order_error", "err", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -56,7 +56,6 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	log.Printf("tenedered : %v\n", req.TenderedAmount)
 	order, payment, err := o.OrdSvc.RecordPayment(uint(orderid), req.TenderedAmount, req.PaymentMethod)
 	if err != nil {
 		slog.Error("Failed to record payment", "err", err)
@@ -65,7 +64,7 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"order":   order,
 		"payment": payment,
 		"message": "payment succesfull",
