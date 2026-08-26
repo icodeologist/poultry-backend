@@ -48,7 +48,7 @@ func (os *OrderService) ValidateCart(items []models.CartlineInput) ([]ValidProdu
 	return validProducts, totalBill, nil
 }
 
-func (os *OrderService) CreateOrder(items []models.CartlineInput) (models.Order, error) {
+func (os *OrderService) CreateOrder(customerID *uint, items []models.CartlineInput) (models.Order, error) {
 	// validate products so no dummy or lose products in the items
 	// aslo get the total price
 	validProducts, totalBill, err := os.ValidateCart(items)
@@ -58,10 +58,21 @@ func (os *OrderService) CreateOrder(items []models.CartlineInput) (models.Order,
 	// now here if one db transaction fails we have to kind of mark it as a failure and start again
 	// so making a transaction here  is wise
 	// have to  create order then orderitems which are linked to single order and then  if something goes wrong cancel all of them
-	// TODO: find a way to link customer id to order
+	// linking customer id with this order
+
+	var customer models.Customer
+	res := os.DB.Where("id=?", customerID).First(&customer)
+	if res.Error != nil {
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return models.Order{}, fmt.Errorf("Customer not found : ID : %v\n", customerID)
+		}
+		// real DB error
+		return models.Order{}, res.Error
+	}
 	var order models.Order
 	err = os.DB.Transaction(func(tx *gorm.DB) error {
 		order = models.Order{
+			CustomerID:     &customer.ID,
 			TimeStamp:      time.Now(),
 			TotalAmount:    totalBill,
 			PaymentBalance: totalBill,
@@ -103,13 +114,15 @@ func (os *OrderService) CreateOrder(items []models.CartlineInput) (models.Order,
 func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string) (models.Order, models.Payment, error) {
 	var order models.Order
 	var payment models.Payment
+	var customer models.Customer
 
 	err := os.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&order, orderID).Error; err != nil {
 			return fmt.Errorf("fetching order with id %v: %v", orderID, err)
 		}
 		if order.Status == "Completed" {
-			return fmt.Errorf("order is fully paid %v", orderID)
+			log.Printf("Order %v is full paid.", orderID)
+			return nil
 		}
 		if tendered <= 0 {
 			return fmt.Errorf("tendered cannot be 0 or negative, order %v", orderID)
