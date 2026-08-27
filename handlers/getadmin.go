@@ -28,8 +28,6 @@ func GetAdmin(w http.ResponseWriter, r *http.Request) {
 }
 
 func toAdminResponse(a models.Admin) models.Admin {
-	log.Println("admin real : ", a)
 	a.Password = "haha you wont get it"
-	log.Println("admin fake : ", a)
 	return a
 }

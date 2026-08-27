@@ -1,9 +1,9 @@
 package handlers
 
+//TODO: recorde payment should record credit to customer.
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -56,7 +56,7 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	order, payment, err := o.OrdSvc.RecordPayment(uint(orderid), req.TenderedAmount, req.PaymentMethod)
+	order, payment, err := o.OrdSvc.RecordPayment(uint(orderid), req.TenderedAmount, req.PaymentMethod, req.PayPreviousCredit, req.PayThroughCredit)
 	if err != nil {
 		slog.Error("Failed to record payment", "err", err)
 		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)

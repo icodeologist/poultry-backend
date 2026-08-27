@@ -130,13 +130,12 @@ func (p *ProductHandler) GetAllProductsFromDB(w http.ResponseWriter, r *http.Req
 type UpdateProductInfo struct {
 	Title         *string  `json:"title"`
 	Price         *float64 `json:"price"`
-	StockQuantity *int     `json:"stockQuantity"`
+	StockQuantity *int     `json:"stock"`
 }
 
 func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	idStr := vars["id"]
-	slog.Info("path value", "id", idStr, "url", r.URL.Path)
 	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
 		writeProductError(w, err)

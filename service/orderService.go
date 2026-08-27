@@ -111,7 +111,7 @@ func (os *OrderService) CreateOrder(customerID *uint, items []models.CartlineInp
 }
 
 // separate way to record payment and update stocks
-func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string) (models.Order, models.Payment, error) {
+func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string, payPreviousCredit bool, payThroughCredit bool) (models.Order, models.Payment, error) {
 	var order models.Order
 	var payment models.Payment
 	var customer models.Customer
@@ -124,19 +124,55 @@ func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMet
 			log.Printf("Order %v is full paid.", orderID)
 			return nil
 		}
-		if tendered <= 0 {
-			return fmt.Errorf("tendered cannot be 0 or negative, order %v", orderID)
+		// fetch customer this if customer wants to pay the credit
+		// fetching first anyways because need to update balance
+		if err := tx.Where("id=?", order.CustomerID).First(&customer).Error; err != nil {
+			return fmt.Errorf("fetch customer with id : %v\n", err)
 		}
-
 		amountDue := order.PaymentBalance
 		var applied, change float64
-		if tendered >= amountDue {
-			applied = amountDue
-			change = tendered - amountDue
+		// just update customer balance
+		log.Printf("Value of paythorughCredit : %v\n", payThroughCredit)
+		if payThroughCredit == true {
+			log.Println("Didnt go in here - if paythorugh credit was true")
+			preBalance := customer.Balance
+			customer.Balance += amountDue
+			log.Printf("order : %v paid with full credit", order.ID)
+			log.Printf("Previous balance : %v Current balance : %v Diffrence : %v\n", preBalance, customer.Balance, customer.Balance-preBalance)
+			log.Printf("Current order : %v total Bill %v\n", order.ID, order.PaymentBalance)
+
 		} else {
-			applied = tendered
-			change = 0
+			log.Println("Went here directly DORA")
+			if tendered <= 0 {
+				return fmt.Errorf("tendered cannot be 0 or negative, order %v", orderID)
+			}
+
+			// if customer wants to just pay the current bill and given tenndered amount >= amount due apply
+			if tendered >= amountDue {
+				applied = amountDue
+				change = tendered - amountDue
+			} else {
+				applied = tendered
+				change = 0.0
+			}
+			var previousBalance float64
+			var subFromBalance float64
+			//if he wants to pay for old credit
+			if payPreviousCredit {
+				// check if he has enough
+				if change > 0.0 {
+					subFromBalance = change
+					previousBalance = customer.Balance
+					customer.Balance = subFromBalance - customer.Balance
+					if err := tx.Save(&customer).Error; err != nil {
+						return fmt.Errorf("save to db customer : %v\n", err)
+					}
+					log.Printf("updated customer %v with balance %v and paid %v\n ", customer.ID, previousBalance, subFromBalance)
+				}
+			}
 		}
+
+		log.Printf("Payment was done through : %v\n", paymentMethod)
 
 		payment = models.Payment{
 			OrderID:        orderID,

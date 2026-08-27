@@ -92,8 +92,9 @@ func (a *AdminHandler) LoginAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := jwt.MapClaims{
-		"role": "admin",
-		"exp":  time.Now().Add(24 * time.Hour).Unix(),
+		"role":     "admin",
+		"exp":      time.Now().Add(24 * time.Hour).Unix(),
+		"admin_id": checkPass.ID,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

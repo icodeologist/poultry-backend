@@ -19,7 +19,7 @@ func main() {
 	db.ConnectTODB()
 	r := mux.NewRouter()
 	customerHandler := handlers.NewCustomerHandler(db.DB)
-	searchHandler := handlers.NewSearchUserCustomHandler(db.DB)
+	// searchHandler := handlers.NewSearchUserCustomHandler(db.DB)
 	adminHandler := handlers.NewAdminHandler(db.DB)
 	productServiceHandler := service.NewProductService(db.DB)
 	productHandler := handlers.NewProductHandler(productServiceHandler)
@@ -56,32 +56,35 @@ func main() {
 	// log.Println("Total Bill : ", total)
 	//
 	c := cors.New(cors.Options{
-		AllowedOrigins: []string{"http://localhost:5173"},
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
 	})
 
-	r.HandleFunc("/create", customerHandler.CreateNewUser)
-	r.HandleFunc("/search/{phonenumber}", searchHandler.SearchByPhoneNumber)
+	r.HandleFunc("/customer/register", customerHandler.CreateNewUser)
+	r.HandleFunc("/customer/{phone}", customerHandler.GetCustomerByPhone)
+	// r.HandleFunc("/search/{phonenumber}", searchHandler.SearchByPhoneNumber)
 	r.HandleFunc("/admin/register", adminHandler.RegisterAdmin)
 	r.HandleFunc("/admin/login", adminHandler.LoginAdmin)
 	r.HandleFunc("/product/create", productHandler.AddProduct)
 	r.HandleFunc("/product/editprice/{id}", productHandler.EditPrice)
-	r.HandleFunc("/product/updateStock/{id}", productHandler.UpdateProductStck)
-	r.HandleFunc("/product/delete/{id}", productHandler.DeleteProduct)
+	// r.HandleFunc("/product/updateStock/{id}", productHandler.UpdateProductStck)
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
-	r.HandleFunc("/new-order", orderHandler.CreateNewOrder)
-	r.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment)
+	// r.HandleFunc("/new-order", orderHandler.CreateNewOrder)
+	// r.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment)
 
 	adminRoute := r.NewRoute().Subrouter()
 	adminRoute.Use(middleware.AdminMiddleware)
 	adminRoute.HandleFunc("/dummy", dummy)
-	adminRoute.HandleFunc("/admin/update-product/{id}", productHandler.UpdateProduct)
+	adminRoute.HandleFunc("/admin/product/{id}", productHandler.UpdateProduct)
+	adminRoute.HandleFunc("/admin/products/{id}", productHandler.DeleteProduct)
+	adminRoute.HandleFunc("/admin/me", handlers.GetAdmin)
 
 	protected := r.NewRoute().Subrouter()
 	protected.Use(middleware.IdempotencyMiddleware(db.DB))
-	protected.HandleFunc("/new-order", orderHandler.CreateNewOrder).Methods("POST")
-	protected.HandleFunc("orders/{id}/payment", orderHandler.RecordPayment).Methods("POST")
+	protected.HandleFunc("/new/order", orderHandler.CreateNewOrder).Methods("POST")
+	protected.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":5000", c.Handler(r)))
 }
