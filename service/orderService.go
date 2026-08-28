@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/icodeologist/poultry-backend/models"
@@ -73,6 +74,7 @@ func (os *OrderService) CreateOrder(customerID *uint, items []models.CartlineInp
 	err = os.DB.Transaction(func(tx *gorm.DB) error {
 		order = models.Order{
 			CustomerID:     &customer.ID,
+			Customer:       customer,
 			TimeStamp:      time.Now(),
 			TotalAmount:    totalBill,
 			PaymentBalance: totalBill,
@@ -110,81 +112,76 @@ func (os *OrderService) CreateOrder(customerID *uint, items []models.CartlineInp
 	return order, nil
 }
 
-// separate way to record payment and update stocks
-func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string, payPreviousCredit bool, payThroughCredit bool) (models.Order, models.Payment, error) {
+// Recordpayment make a db transaction to make all the calls succeed or all calls to db fail
+// The reason is since its a payment procedure and requires multiple models or data objects to alter and update slight uncertainity will make wrong writes to models
+// So if one failes rest will never happen and the current one will wont write
+// In this function we do 3 things. First For a given order with ORDER ID ill record the payment that they are giving whether cash or upi
+// 2 is Im handling what if the customer wants to pay previous credit with remaining change (only applicable if the customer chose paymentMethod as - cash)
+// 3 if the customer wants to pay entire order with credit- so store it to previous balance
+
+func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMethod string, payPreviousCredit bool, payThroughCredit bool) (models.Order, models.Payment, models.Customer, error) {
 	var order models.Order
 	var payment models.Payment
 	var customer models.Customer
 
 	err := os.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.First(&order, orderID).Error; err != nil {
+		if err := tx.Preload("Customer").First(&order, orderID).Error; err != nil {
 			return fmt.Errorf("fetching order with id %v: %v", orderID, err)
 		}
 		if order.Status == "Completed" {
 			log.Printf("Order %v is full paid.", orderID)
 			return nil
 		}
-		// fetch customer this if customer wants to pay the credit
-		// fetching first anyways because need to update balance
 		if err := tx.Where("id=?", order.CustomerID).First(&customer).Error; err != nil {
 			return fmt.Errorf("fetch customer with id : %v\n", err)
 		}
 		amountDue := order.PaymentBalance
 		var applied, change float64
-		// just update customer balance
-		log.Printf("Value of paythorughCredit : %v\n", payThroughCredit)
-		if payThroughCredit == true {
-			log.Println("Didnt go in here - if paythorugh credit was true")
-			preBalance := customer.Balance
+		var isPaymentByCredit bool
+		// if payment is through credit just update previous balance and make payemtn
+		if payThroughCredit {
 			customer.Balance += amountDue
-			log.Printf("order : %v paid with full credit", order.ID)
-			log.Printf("Previous balance : %v Current balance : %v Diffrence : %v\n", preBalance, customer.Balance, customer.Balance-preBalance)
-			log.Printf("Current order : %v total Bill %v\n", order.ID, order.PaymentBalance)
-
+			applied = amountDue
+			isPaymentByCredit = true
 		} else {
-			log.Println("Went here directly DORA")
 			if tendered <= 0 {
 				return fmt.Errorf("tendered cannot be 0 or negative, order %v", orderID)
 			}
-
-			// if customer wants to just pay the current bill and given tenndered amount >= amount due apply
+			// if not then simply do basic math
 			if tendered >= amountDue {
 				applied = amountDue
 				change = tendered - amountDue
 			} else {
 				applied = tendered
 				change = 0.0
+				shortFall := amountDue - tendered
+				customer.Balance += shortFall
 			}
-			var previousBalance float64
-			var subFromBalance float64
-			//if he wants to pay for old credit
+
+			// if change is greater and only if custmoer wants to pay then proceed with this step
 			if payPreviousCredit {
-				// check if he has enough
-				if change > 0.0 {
-					subFromBalance = change
-					previousBalance = customer.Balance
-					customer.Balance = subFromBalance - customer.Balance
-					if err := tx.Save(&customer).Error; err != nil {
-						return fmt.Errorf("save to db customer : %v\n", err)
-					}
-					log.Printf("updated customer %v with balance %v and paid %v\n ", customer.ID, previousBalance, subFromBalance)
+				if change > 0.0 && customer.Balance > 0.0 {
+					creditPaid := math.Min(change, customer.Balance)
+					customer.Balance -= creditPaid
+					change -= creditPaid
+				} else {
+					log.Printf("insufficient funds : %v or Your balance is already paid : %v\n", change, customer.Balance)
 				}
 			}
 		}
-
-		log.Printf("Payment was done through : %v\n", paymentMethod)
-
+		// create  a payment
 		payment = models.Payment{
-			OrderID:        orderID,
-			AmountTendered: tendered,
-			ChangeGiven:    change,
-			Method:         paymentMethod,
-			TimeStamp:      time.Now(),
+			OrderID:              orderID,
+			AmountTendered:       tendered,
+			ChangeGiven:          change,
+			Method:               paymentMethod,
+			TimeStamp:            time.Now(),
+			PaymentThroughCredit: isPaymentByCredit,
 		}
 		if err := tx.Create(&payment).Error; err != nil {
 			return fmt.Errorf("creating payment: %w", err)
 		}
-
+		// update the balance of the order in order to determine that if this order is done or not
 		order.PaymentBalance -= applied
 		if order.PaymentBalance <= 0.01 {
 			order.PaymentBalance = 0
@@ -193,8 +190,10 @@ func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMet
 		if err := tx.Save(&order).Error; err != nil {
 			return fmt.Errorf("updating order: %w", err)
 		}
+		if err := tx.Save(&customer).Error; err != nil {
+			return fmt.Errorf("updating customer: %w", err)
+		}
 		return nil
 	})
-
-	return order, payment, err
+	return order, payment, customer, err
 }

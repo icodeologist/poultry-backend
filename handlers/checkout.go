@@ -56,7 +56,7 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	order, payment, err := o.OrdSvc.RecordPayment(uint(orderid), req.TenderedAmount, req.PaymentMethod, req.PayPreviousCredit, req.PayThroughCredit)
+	order, payment, _, err := o.OrdSvc.RecordPayment(uint(orderid), req.TenderedAmount, req.PaymentMethod, req.PayPreviousCredit, req.PayThroughCredit)
 	if err != nil {
 		slog.Error("Failed to record payment", "err", err)
 		http.Error(w, fmt.Sprint(err), http.StatusBadRequest)
@@ -70,3 +70,7 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		"message": "payment succesfull",
 	})
 }
+
+// no old pay no through credit just exact amounmt
+// no old pay no thorugh credit more money - exact change
+// old pay no through credit more money - change 0 customer.Balance -  980
