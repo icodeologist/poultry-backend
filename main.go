@@ -73,6 +73,8 @@ func main() {
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
 	// r.HandleFunc("/new-order", orderHandler.CreateNewOrder)
 	// r.HandleFunc("/orders/{id}/payment", orderHandler.RecordPayment)
+	r.HandleFunc("/customers/{id}", customerHandler.AddBalance)
+	r.HandleFunc("/updateStock/{id}", productHandler.UpdateProduct)
 
 	adminRoute := r.NewRoute().Subrouter()
 	adminRoute.Use(middleware.AdminMiddleware)
