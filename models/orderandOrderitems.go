@@ -18,7 +18,7 @@ type OrderItem struct {
 	ID          uint
 	ProductId   uint
 	OrderId     uint
-	Quantity    int
+	Quantity    float64
 	PriceAtSale float64
 }
 
