@@ -65,7 +65,7 @@ func main() {
 	r.HandleFunc("/customer/register", customerHandler.CreateNewUser)
 	r.HandleFunc("/customer/{phone}", customerHandler.GetCustomerByPhone)
 	// r.HandleFunc("/search/{phonenumber}", searchHandler.SearchByPhoneNumber)
-	r.HandleFunc("/admin/register", adminHandler.RegisterAdmin)
+	// r.HandleFunc("/admin/register", adminHandler.RegisterAdmin)
 	r.HandleFunc("/admin/login", adminHandler.LoginAdmin)
 	r.HandleFunc("/product/create", productHandler.AddProduct)
 	r.HandleFunc("/product/editprice/{id}", productHandler.EditPrice)
@@ -77,7 +77,7 @@ func main() {
 	r.HandleFunc("/updateStock/{id}", productHandler.UpdateProduct)
 
 	adminRoute := r.NewRoute().Subrouter()
-	adminRoute.Use(middleware.AdminMiddleware)
+	adminRoute.Use(middleware.UserMiddleware)
 	adminRoute.HandleFunc("/dummy", dummy)
 	adminRoute.HandleFunc("/admin/product/{id}", productHandler.UpdateProduct)
 	adminRoute.HandleFunc("/admin/products/{id}", productHandler.DeleteProduct)
