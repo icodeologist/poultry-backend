@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/icodeologist/poultry-backend/models"
 )
 
+// TODO: tehre is some bug here so lets fix after wards
 func GetAdmin(w http.ResponseWriter, r *http.Request) {
 	adminID := r.Context().Value("adminID")
 	log.Println("admin id inside get/me : ", adminID)
@@ -30,4 +32,28 @@ func GetAdmin(w http.ResponseWriter, r *http.Request) {
 func toAdminResponse(a models.Admin) models.Admin {
 	a.Password = "haha you wont get it"
 	return a
+}
+
+func GetCurrentRole(w http.ResponseWriter, r *http.Request) {
+	role, ok := r.Context().Value("role").(string)
+	if !ok {
+		http.Error(w, fmt.Sprint("role cannot be empty"), http.StatusBadRequest)
+		return
+	}
+	// var adminID, staffID float64
+	if role == "admin" {
+		adminIDVal, ok := r.Context().Value("adminID").(float64)
+		if !ok {
+			http.Error(w, fmt.Sprint("no id admin"), http.StatusBadRequest)
+			return
+		}
+		log.Printf("adminValID : %v\n", adminIDVal)
+	} else if role == "staff" {
+		staffIDVal, ok := r.Context().Value("staffID").(float64)
+		if !ok {
+			http.Error(w, fmt.Sprint("no id staff"), http.StatusBadRequest)
+			return
+		}
+		log.Printf("staffIDval : %v\n", staffIDVal)
+	}
 }
