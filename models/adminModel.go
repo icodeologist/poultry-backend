@@ -5,9 +5,10 @@ type Admin struct {
 	AdminEmail string `json:"admin_email"`
 	AdminName  string `json:"admin_name"`
 	Password   string `json:"password"`
+	Role       string `json:"role"`
 }
 
-type AdminLoginInfo struct {
+type UserLoginInfo struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }

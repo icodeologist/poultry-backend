@@ -95,7 +95,7 @@ func (os *OrderService) CreateOrder(customerID *uint, items []models.CartlineInp
 			item := models.OrderItem{
 				ProductId:   v.Product.ID,
 				OrderId:     order.ID,
-				Quantity:    int(v.Quantity),
+				Quantity:    float64(v.Quantity),
 				PriceAtSale: v.Product.Price,
 			}
 			if err := tx.Create(&item).Error; err != nil {
@@ -170,6 +170,7 @@ func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMet
 			}
 		}
 		// create  a payment
+		log.Println("Change given : ", change)
 		payment = models.Payment{
 			OrderID:              orderID,
 			AmountTendered:       tendered,

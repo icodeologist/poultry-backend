@@ -101,9 +101,11 @@ func UserMiddleware(next http.Handler) http.Handler {
 
 		if role == "staff" {
 			ctx := context.WithValue(r.Context(), "staffID", userID)
+			ctx = context.WithValue(ctx, "role", "staff")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		} else if role == "admin" {
 			ctx := context.WithValue(r.Context(), "adminID", userID)
+			ctx = context.WithValue(ctx, "role", "admin")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		} else {
 			slog.Error("invalid role", "role", role)

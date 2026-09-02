@@ -4,6 +4,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -42,6 +43,7 @@ func (o *OrderHandler) CreateNewOrder(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
+	log.Println("JUST GOT HIT HMM")
 	vars := mux.Vars(r)
 	idParam := vars["id"]
 	orderid, err := strconv.ParseInt(idParam, 10, 64)
@@ -65,10 +67,12 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]any{
-		"order":   order,
-		"payment": payment,
-		"message": "payment succesfull",
+		"order":        order,
+		"payment":      payment,
+		"message":      "payment succesfull",
+		"change_given": payment.ChangeGiven,
 	})
+	// json.NewEncoder(w).Encode(payment)
 }
 
 // no old pay no through credit just exact amounmt

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -21,8 +22,8 @@ func IdempotencyMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 				return
 			}
 			key := r.Header.Get("Idempotency-Key")
-			log.Println("KEY : ", key)
 			if key == "" {
+				slog.Error("Key is empty", "Key", key)
 				http.Error(w, "key is empty. Unauthorized", http.StatusUnauthorized)
 				// may be check if the key is correct here
 				// liek the format or something
