@@ -24,6 +24,19 @@ type ProductService struct {
 
 func NewProductService(db *gorm.DB) *ProductService {
 	return &ProductService{DB: db}
+
+}
+func (s *ProductService) GetProductByID(productID uint) (models.Product, error) {
+	var product models.Product
+	res := s.DB.First(&product, productID)
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		slog.Warn("Product not found", "id", productID)
+		return models.Product{}, ErrNotFound
+	} else if res.Error != nil {
+		slog.Error("DB error fetching product by ID", "err", res.Error)
+		return models.Product{}, res.Error
+	}
+	return product, nil
 }
 
 func (s *ProductService) AddProduct(product models.Product) (models.Product, error) {

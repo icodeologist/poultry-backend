@@ -21,6 +21,25 @@ func NewProductHandler(svc *service.ProductService) *ProductHandler {
 		Svc: svc,
 	}
 }
+func (p *ProductHandler) GetProductByID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	idParam := vars["id"]
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		writeProductError(w, service.ErrNotFound)
+		return
+	}
+
+	product, err := p.Svc.GetProductByID(uint(id))
+	if err != nil {
+		writeProductError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(product)
+}
 
 func (p *ProductHandler) AddProduct(w http.ResponseWriter, r *http.Request) {
 	var product models.Product
