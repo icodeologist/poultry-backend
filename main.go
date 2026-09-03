@@ -68,8 +68,9 @@ func main() {
 	r.HandleFunc("/products/new", productHandler.AddProduct)
 	r.HandleFunc("/product/editprice/{id}", productHandler.EditPrice)
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
+	r.HandleFunc("/products/{id}", productHandler.GetProductByID)
 	r.HandleFunc("/customers/{id}", customerHandler.AddBalance)
-	r.HandleFunc("/products/edit/{id}", productHandler.UpdateProduct)
+	r.HandleFunc("/products/edit/{id}", productHandler.UpdateProduct).Methods("PATCH")
 
 	adminRoute := r.NewRoute().Subrouter()
 	adminRoute.Use(middleware.UserMiddleware)
