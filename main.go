@@ -79,6 +79,8 @@ func main() {
 	// Keep the legacy read paths authenticated for existing clients.
 	productRoutes.HandleFunc("/products", productHandler.GetAllProductsFromDB).Methods("GET")
 	productRoutes.HandleFunc("/products/{id}", productHandler.GetProductByID).Methods("GET")
+	// Vite removes the public /api prefix before proxying requests in development.
+	productRoutes.HandleFunc("/products/{id}/stock", productHandler.UpdateProductStck).Methods("PATCH")
 
 	adminProducts := r.NewRoute().Subrouter()
 	adminProducts.Use(middleware.UserMiddleware)
