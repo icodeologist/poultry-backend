@@ -15,6 +15,8 @@ type OrderService struct {
 	DB *gorm.DB
 }
 
+var ErrOrderNotFound = errors.New("order not found")
+
 func NewOrderService(db *gorm.DB) *OrderService {
 	return &OrderService{DB: db}
 }
@@ -197,4 +199,79 @@ func (os *OrderService) RecordPayment(orderID uint, tendered float64, paymentMet
 		return nil
 	})
 	return order, payment, customer, err
+}
+
+// GetInvoice builds an invoice report from the existing order and payment data.
+// An invoice is a read model, so it does not need its own database table.
+func (os *OrderService) GetInvoice(orderID uint) (models.Invoice, error) {
+	var order models.Order
+	if err := os.DB.Preload("Customer").Preload("OrderItems").First(&order, orderID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.Invoice{}, ErrOrderNotFound
+		}
+		return models.Invoice{}, fmt.Errorf("fetching order for invoice: %w", err)
+	}
+
+	var payments []models.Payment
+	if err := os.DB.Where("order_id = ?", orderID).Order("time_stamp desc").Find(&payments).Error; err != nil {
+		return models.Invoice{}, fmt.Errorf("fetching payments for invoice: %w", err)
+	}
+
+	customerType := "Regular"
+	amountStatus := "Pending"
+	paymentMethod := ""
+	paidThroughCredit := false
+	for _, payment := range payments {
+		if paymentMethod == "" && payment.Method != "" {
+			paymentMethod = payment.Method
+		}
+		if payment.PaymentThroughCredit {
+			paidThroughCredit = true
+		}
+	}
+
+	if paidThroughCredit {
+		customerType = "Credit"
+		amountStatus = "Credit"
+	} else if order.Status == "Completed" && order.PaymentBalance == 0 {
+		amountStatus = "Paid"
+	}
+	customerName := order.Customer.Name
+	if customerName == "" {
+		customerName = "Walk-in Customer"
+	}
+	var itemsSold float64
+	for _, item := range order.OrderItems {
+		itemsSold += item.Quantity
+	}
+
+	return models.Invoice{
+		InvoiceID:     fmt.Sprintf("INV-%06d", order.ID),
+		OrderID:       order.ID,
+		CustomerID:    order.Customer.ID,
+		CustomerName:  customerName,
+		CustomerType:  customerType,
+		Time:          order.TimeStamp,
+		Amount:        order.TotalAmount,
+		AmountStatus:  amountStatus,
+		ItemsSold:     itemsSold,
+		PaymentMethod: paymentMethod,
+	}, nil
+}
+
+// GetInvoices returns generated invoice read models for the latest orders.
+func (os *OrderService) GetInvoices(limit int) ([]models.Invoice, error) {
+	var orders []models.Order
+	if err := os.DB.Order("time_stamp desc").Limit(limit).Find(&orders).Error; err != nil {
+		return nil, fmt.Errorf("fetching recent orders: %w", err)
+	}
+	invoices := make([]models.Invoice, 0, len(orders))
+	for _, order := range orders {
+		invoice, err := os.GetInvoice(order.ID)
+		if err != nil {
+			return nil, err
+		}
+		invoices = append(invoices, invoice)
+	}
+	return invoices, nil
 }

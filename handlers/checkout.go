@@ -3,6 +3,7 @@ package handlers
 //TODO: recorde payment should record credit to customer.
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -73,6 +74,51 @@ func (o *OrderHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
 		"change_given": payment.ChangeGiven,
 	})
 	// json.NewEncoder(w).Encode(payment)
+}
+
+func (o *OrderHandler) GetInvoice(w http.ResponseWriter, r *http.Request) {
+	idParam := mux.Vars(r)["id"]
+	orderID, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil || orderID == 0 {
+		http.Error(w, "invalid order id", http.StatusBadRequest)
+		return
+	}
+
+	invoice, err := o.OrdSvc.GetInvoice(uint(orderID))
+	if err != nil {
+		if errors.Is(err, service.ErrOrderNotFound) {
+			http.Error(w, "order not found", http.StatusNotFound)
+			return
+		}
+		slog.Error("Failed to create invoice", "err", err)
+		http.Error(w, "failed to create invoice", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(invoice)
+}
+
+func (o *OrderHandler) GetInvoices(w http.ResponseWriter, r *http.Request) {
+	limit := 10
+	if value := r.URL.Query().Get("limit"); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil || parsed < 1 || parsed > 100 {
+			http.Error(w, "limit must be between 1 and 100", http.StatusBadRequest)
+			return
+		}
+		limit = parsed
+	}
+
+	invoices, err := o.OrdSvc.GetInvoices(limit)
+	if err != nil {
+		slog.Error("Failed to get invoices", "err", err)
+		http.Error(w, "failed to get invoices", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(invoices)
 }
 
 // no old pay no through credit just exact amounmt

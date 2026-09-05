@@ -70,6 +70,8 @@ func main() {
 	r.HandleFunc("/products", productHandler.GetAllProductsFromDB)
 	r.HandleFunc("/products/{id}", productHandler.GetProductByID)
 	r.HandleFunc("/customers/{id}", customerHandler.AddBalance)
+	r.HandleFunc("/invoice/{id}", orderHandler.GetInvoice).Methods("GET")
+	r.HandleFunc("/invoices", orderHandler.GetInvoices).Methods("GET")
 	r.HandleFunc("/products/edit/{id}", productHandler.UpdateProduct).Methods("PATCH")
 
 	adminRoute := r.NewRoute().Subrouter()
