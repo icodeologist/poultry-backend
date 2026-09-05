@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type CreditSummary struct {
@@ -12,6 +13,14 @@ type CreditSummary struct {
 	TotalCustomers            int64   `json:"total_customers"`
 	PendingCustomerPercentage float64 `json:"pending_customer_percentage"`
 	SettlementHealth          string  `json:"settlement_health"`
+}
+
+type CreditLedgerCustomer struct {
+	ID           uint       `json:"id"`
+	Name         string     `json:"name"`
+	PhoneNumber  string     `json:"phone_number"`
+	Balance      float64    `json:"balance"`
+	LastPurchase *time.Time `json:"last_purchase"`
 }
 
 // GetCreditSummary returns the current customer-credit exposure. A balance is
@@ -48,4 +57,23 @@ func (ch *CustomerHandler) GetCreditSummary(w http.ResponseWriter, _ *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(summary)
+}
+
+// GetCreditLedger returns real customer balances together with each
+// customer's latest order date. Customers without orders are retained.
+func (ch *CustomerHandler) GetCreditLedger(w http.ResponseWriter, _ *http.Request) {
+	customers := make([]CreditLedgerCustomer, 0)
+	result := ch.DB.Table("customers").
+		Select(`customers.id, customers.name, customers.phone_number, customers.balance,
+			(SELECT MAX(orders.time_stamp) FROM orders WHERE orders.customer_id = customers.id) AS last_purchase`).
+		Order("customers.balance DESC, customers.name ASC").
+		Scan(&customers)
+	if result.Error != nil {
+		slog.Error("failed to load credit ledger", "err", result.Error)
+		http.Error(w, "failed to load credit ledger", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(customers)
 }
