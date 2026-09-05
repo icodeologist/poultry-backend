@@ -49,7 +49,7 @@ func IdempotencyMiddleware(db *gorm.DB) func(http.Handler) http.Handler {
 					return
 				} else {
 					if existing.ResponseStatus == 0 {
-						fmt.Fprintf(w, fmt.Sprintf("Request with key :%v is still processing.\n", key))
+						fmt.Fprintf(w, "Request with key :%v is still processing.\n", key)
 						return
 					}
 					w.WriteHeader(existing.ResponseStatus)
