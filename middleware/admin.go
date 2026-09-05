@@ -11,7 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const adminIDKey = "adminID"
+const (
+	adminIDKey = "adminID"
+	staffIDKey = "staffID"
+	roleKey    = "role"
+)
 
 // admin middleware parses through incoming reqeust and gets the unique key kind  of like jwt
 // you take the key and decrypt it using hashing with local stored secret key and if they match you edit the role to admin
@@ -21,13 +25,13 @@ const adminIDKey = "adminID"
 //	view all orders
 //	view or edit stocks
 //	have a detail of cash flow  (nice dashboard with daily income expense basic crud)
-func UserMiddleware(next http.Handler) http.Handler {
+func Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("user-authorization")
 		if err != nil {
 			switch {
 			case errors.Is(err, http.ErrNoCookie):
-				http.Error(w, "cookie not found", http.StatusBadRequest)
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			default:
 				log.Println(err)
@@ -83,8 +87,8 @@ func UserMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		role, ok := claims["role"]
-		if !ok {
+		role, ok := claims["role"].(string)
+		if !ok || role == "" {
 			slog.Error("no role mentioned", "role", role)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -99,18 +103,45 @@ func UserMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if role == "staff" {
-			ctx := context.WithValue(r.Context(), "staffID", userID)
-			ctx = context.WithValue(ctx, "role", "staff")
-			next.ServeHTTP(w, r.WithContext(ctx))
-		} else if role == "admin" {
-			ctx := context.WithValue(r.Context(), "adminID", userID)
-			ctx = context.WithValue(ctx, "role", "admin")
-			next.ServeHTTP(w, r.WithContext(ctx))
-		} else {
-			slog.Error("invalid role", "role", role)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+		ctx := context.WithValue(r.Context(), roleKey, role)
+		switch role {
+		case "staff":
+			ctx = context.WithValue(ctx, staffIDKey, userID)
+		case "admin":
+			ctx = context.WithValue(ctx, adminIDKey, userID)
 		}
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// RequireRoles authorizes an already authenticated request for one of the
+// supplied roles. It deliberately treats unknown roles as forbidden rather
+// than unauthenticated.
+func RequireRoles(roles ...string) func(http.Handler) http.Handler {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		allowed[role] = struct{}{}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role, ok := r.Context().Value(roleKey).(string)
+			if !ok {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			if _, ok := allowed[role]; !ok {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// UserMiddleware remains the admin-only middleware used by existing admin
+// routes. Authentication and authorization are composed separately so routes
+// shared with staff can use Authenticate plus RequireRoles.
+func UserMiddleware(next http.Handler) http.Handler {
+	return Authenticate(RequireRoles("admin")(next))
 }
