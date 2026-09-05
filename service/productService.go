@@ -16,6 +16,7 @@ var (
 	ErrInvalidPrice = errors.New("product price must be greater than 0")
 	ErrDuplicate    = errors.New("product already exists")
 	ErrNotFound     = errors.New("product not found")
+	ErrInvalidStock = errors.New("stock quantity must be greater than or equal to 0")
 )
 
 type ProductService struct {
@@ -128,23 +129,24 @@ func (s *ProductService) GetAllProducts() ([]models.Product, error) {
 	return products, nil
 }
 
-func (s *ProductService) UpdateProductStock(productID uint, updateUnits int) (models.Product, error) {
-	var product models.Product
-	res := s.DB.First(&product, productID)
-	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
-		slog.Warn("Product not found for delete", "id", productID)
-		return product, ErrNotFound
-	} else if res.Error != nil {
-		slog.Error("DB error", "err", res.Error)
-		return product, res.Error
+func (s *ProductService) UpdateProductStock(productID uint, quantity int) (models.Product, error) {
+	if quantity < 0 {
+		return models.Product{}, ErrInvalidStock
 	}
-	product.Stock_Quantity += updateUnits
 
-	if err := s.DB.Save(&product).Error; err != nil {
-		slog.Error("Failed to save product", "err", err)
-		return product, err
+	// Update only the stock column. This avoids a read-modify-save cycle that
+	// could overwrite concurrent changes to unrelated product fields.
+	res := s.DB.Model(&models.Product{}).
+		Where("id = ?", productID).
+		Update("stock_quantity", quantity)
+	if res.Error != nil {
+		return models.Product{}, fmt.Errorf("updating product stock: %w", res.Error)
 	}
-	return product, nil
+	if res.RowsAffected == 0 {
+		return models.Product{}, ErrNotFound
+	}
+
+	return s.GetProductByID(productID)
 }
 
 func (s *ProductService) UpdateProduct(id uint64, updates map[string]interface{}) (*models.Product, error) {
@@ -160,6 +162,9 @@ func (s *ProductService) UpdateProduct(id uint64, updates map[string]interface{}
 	if err := s.DB.Model(&product).Updates(updates).Error; err != nil {
 		return nil, fmt.Errorf("updating product: %w", err)
 	}
-
+	// Re-fetch so the response contains the values persisted by the map update.
+	if err := s.DB.First(&product, id).Error; err != nil {
+		return nil, fmt.Errorf("refetching product: %w", err)
+	}
 	return &product, nil
 }

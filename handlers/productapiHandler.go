@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -105,7 +106,7 @@ func (p *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 }
 
 type updateStock struct {
-	Stock int `json:"stock"`
+	StockQuantity *int `json:"stockQuantity"`
 }
 
 func (p *ProductHandler) UpdateProductStck(w http.ResponseWriter, r *http.Request) {
@@ -117,19 +118,29 @@ func (p *ProductHandler) UpdateProductStck(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var up updateStock
-	if err := json.NewDecoder(r.Body).Decode(&up); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&up); err != nil || up.StockQuantity == nil {
 		slog.Error("Invalid json", "err", err)
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if *up.StockQuantity < 0 {
+		writeProductError(w, service.ErrInvalidStock)
+		return
+	}
 
-	pdct, err := p.Svc.UpdateProductStock(uint(id), up.Stock)
+	pdct, err := p.Svc.UpdateProductStock(uint(id), *up.StockQuantity)
 	if err != nil {
 		writeProductError(w, err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted)
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(pdct)
 
 }
@@ -140,7 +151,8 @@ func (p *ProductHandler) GetAllProductsFromDB(w http.ResponseWriter, r *http.Req
 		writeProductError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusContinue)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(products)
 }
 
@@ -214,7 +226,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 func writeProductError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, service.ErrInvalidPrice), errors.Is(err, service.ErrEmptyTitle):
+	case errors.Is(err, service.ErrInvalidPrice), errors.Is(err, service.ErrEmptyTitle), errors.Is(err, service.ErrInvalidStock):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	case errors.Is(err, service.ErrDuplicate):
 		http.Error(w, err.Error(), http.StatusConflict)
