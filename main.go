@@ -66,7 +66,6 @@ func main() {
 	r.HandleFunc("/customer/{phone}", customerHandler.GetCustomerByPhone)
 	r.HandleFunc("/admin/login", adminHandler.LoginAdmin)
 	r.HandleFunc("/customers/{id}", customerHandler.AddBalance)
-	r.HandleFunc("/credit/summary", customerHandler.GetCreditSummary).Methods("GET")
 	r.HandleFunc("/invoice/{id}", orderHandler.GetInvoice).Methods("GET")
 	r.HandleFunc("/invoices", orderHandler.GetInvoices).Methods("GET")
 
@@ -81,6 +80,8 @@ func main() {
 	productRoutes.HandleFunc("/products/{id}", productHandler.GetProductByID).Methods("GET")
 	// Vite removes the public /api prefix before proxying requests in development.
 	productRoutes.HandleFunc("/products/{id}/stock", productHandler.UpdateProductStck).Methods("PATCH")
+	productRoutes.HandleFunc("/credit/summary", customerHandler.GetCreditSummary).Methods("GET")
+	productRoutes.HandleFunc("/credit/ledger", customerHandler.GetCreditLedger).Methods("GET")
 
 	adminProducts := r.NewRoute().Subrouter()
 	adminProducts.Use(middleware.UserMiddleware)
@@ -91,6 +92,7 @@ func main() {
 	adminProducts.HandleFunc("/products/new", productHandler.AddProduct).Methods("POST")
 	adminProducts.HandleFunc("/product/editprice/{id}", productHandler.EditPrice).Methods("PATCH", "PUT")
 	adminProducts.HandleFunc("/products/edit/{id}", productHandler.UpdateProduct).Methods("PATCH")
+	adminProducts.HandleFunc("/reports/summary", orderHandler.GetSalesReport).Methods("GET")
 
 	adminRoute := r.NewRoute().Subrouter()
 	adminRoute.Use(middleware.UserMiddleware)
